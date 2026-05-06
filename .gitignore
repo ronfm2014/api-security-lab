@@ -1,0 +1,32 @@
+# Lab artifacts - never commit these
+reports/*.md
+reports/*.pdf
+reports/*.html
+!reports/templates/
+
+# Secrets
+.env
+*.key
+*.pem
+secrets/
+
+# Docker
+.docker/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tool output
+*.json.bak
+ffuf-*.json
+kr-results.txt

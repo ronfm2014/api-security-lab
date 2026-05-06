@@ -1,0 +1,134 @@
+version: "3.8"
+
+# ============================================================
+# API Security Lab — Docker Compose
+# OWASP API Top 10 Attack & Defense Environment
+# ============================================================
+#
+# Usage:
+#   docker compose up -d          # Start lab
+#   docker compose down -v        # Stop + clean volumes
+#   docker compose logs -f crapi  # Follow target logs
+#
+# Targets:
+#   crAPI  → http://localhost:8888   (main target)
+#   Mail   → http://localhost:8025   (email capture)
+#   VAmPI  → http://localhost:5000   (secondary target)
+# ============================================================
+
+networks:
+  api-lab:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  crapi-db:
+  crapi-mongo:
+
+services:
+
+  # ----------------------------------------------------------
+  # crAPI — Completely Ridiculous API (OWASP primary target)
+  # ----------------------------------------------------------
+  crapi:
+    image: crapi/crapi:latest
+    container_name: crapi
+    restart: unless-stopped
+    environment:
+      - DB_NAME=crapi
+      - DB_USER=admin
+      - DB_PASSWORD=crapisecretpassword
+      - DB_HOST=crapi-postgres
+      - DB_PORT=5432
+      - SERVER_PORT=8888
+      - SMTP_HOST=mailhog
+      - SMTP_PORT=1025
+      - SMTP_EMAIL=crapi@example.com
+      - MONGO_DB_HOST=crapi-mongo
+      - MONGO_DB_PORT=27017
+      - MONGO_DB_NAME=crapi
+      - SECRET_KEY=crapi-secret-key-change-in-prod
+    ports:
+      - "8888:8888"
+    depends_on:
+      - crapi-postgres
+      - crapi-mongo
+      - mailhog
+    networks:
+      api-lab:
+        ipv4_address: 172.28.0.2
+
+  crapi-postgres:
+    image: postgres:14
+    container_name: crapi-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=crapi
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=crapisecretpassword
+    volumes:
+      - crapi-db:/var/lib/postgresql/data
+    networks:
+      api-lab:
+        ipv4_address: 172.28.0.3
+
+  crapi-mongo:
+    image: mongo:4.4
+    container_name: crapi-mongo
+    restart: unless-stopped
+    volumes:
+      - crapi-mongo:/data/db
+    networks:
+      api-lab:
+        ipv4_address: 172.28.0.4
+
+  # ----------------------------------------------------------
+  # MailHog — SMTP capture (intercept registration emails)
+  # ----------------------------------------------------------
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    networks:
+      api-lab:
+        ipv4_address: 172.28.0.5
+
+  # ----------------------------------------------------------
+  # VAmPI — Lightweight Flask REST API (secondary target)
+  # ----------------------------------------------------------
+  vampi:
+    image: erev0s/vampi:latest
+    container_name: vampi
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    networks:
+      api-lab:
+        ipv4_address: 172.28.0.6
+
+  # ----------------------------------------------------------
+  # Attacker — Custom Kali-slim workstation
+  # All tools pre-installed, shares host network for proxying
+  # ----------------------------------------------------------
+  attacker:
+    build:
+      context: ./tools
+      dockerfile: attacker.Dockerfile
+    container_name: attacker
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    environment:
+      - CRAPI_URL=http://172.28.0.2:8888
+      - VAMPI_URL=http://172.28.0.6:5000
+    volumes:
+      - ./tools/scripts:/opt/scripts
+      - ./reports:/opt/reports
+    networks:
+      api-lab:
+        ipv4_address: 172.28.0.10
