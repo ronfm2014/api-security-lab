@@ -1,6 +1,7 @@
 # API Security Lab — OWASP API Top 10 Attack & Defense Playbook
 
 > **Author:** Ronald
+> 
 > **Purpose:** Hands-on lab environment for attacking and defending REST APIs against the OWASP API Security Top 10 (2023)  
 > **Status:** Active · Continuously updated
 
